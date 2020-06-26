@@ -6,8 +6,7 @@ import (
 	"path"
 	"runtime"
 
-	"github.com/TiboStev/hugo-wrapper/hugo"
-	"github.com/mholt/archiver"
+	archiver "github.com/mholt/archiver/v3"
 	"github.com/pkg/errors"
 )
 
@@ -16,7 +15,7 @@ type VersionManager struct {
 }
 type HugoInstaller struct {
 	installDirectory string
-	selectedVersion  *hugo.Version
+	selectedVersion  *Version
 	execPath         string
 }
 
@@ -28,11 +27,12 @@ func NewVersionManager(installDirectory string) (*VersionManager, error) {
 }
 
 func (manager *VersionManager) GetExecPath(desiredVersion string) (execPath string, version string, err error) {
-	selectedVersion, err := hugo.NewVersion(desiredVersion)
-	version = selectedVersion.String()
+	selectedVersion, err := NewVersion(desiredVersion)
 	if err != nil {
 		return
 	}
+	fmt.Printf("%+v", selectedVersion)
+	version = selectedVersion.String()
 	execPath = path.Join(manager.installDirectory, selectedVersion.String(), binaryName())
 	if isAlreadyInstalled(execPath) {
 		fmt.Println("found local installation")
@@ -47,7 +47,7 @@ func (manager *VersionManager) GetExecPath(desiredVersion string) (execPath stri
 	return
 }
 
-func (manager *VersionManager) install(execPath string, version *hugo.Version) (err error) {
+func (manager *VersionManager) install(execPath string, version *Version) (err error) {
 	fmt.Println("download started")
 	assetTmpFile, err := version.GetAsset()
 	fmt.Println("download ended")
