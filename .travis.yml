@@ -2,4 +2,5 @@ language: go
 
 go: 
   - 1.15.x
+before_script: "go get https://github.com/TiboStev/pflag && go get https://github.com/TiboStev/cobra"
 script: "go test -cover -v -gcflags=-l"
