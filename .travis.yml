@@ -1,6 +1,5 @@
-language:go
+language: go
 
-go:
-- 1.15.x
-
-gobuild_args: -gcflags=-l
+go: 
+  - 1.15.x
+gobuild_args: "-gcflags=-l"
