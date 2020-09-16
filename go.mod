@@ -13,7 +13,3 @@ require (
 	github.com/pkg/errors v0.8.0
 	github.com/stretchr/testify v1.2.2
 )
-
-replace github.com/TiboStev/cobra v1.0.0 => ../cobra
-
-replace github.com/TiboStev/pflag v1.0.5 => ../pflag
