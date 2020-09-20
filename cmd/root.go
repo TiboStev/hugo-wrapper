@@ -21,10 +21,10 @@ import (
 	"os/exec"
 	"path"
 
-	"github.com/TiboStev/cobra"
 	"github.com/TiboStev/hugo-wrapper/versionmanager"
-	"github.com/TiboStev/pflag"
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -33,14 +33,14 @@ var hugoVersion string
 
 //var onWrapper bool
 var rootCmd = &cobra.Command{
-	Use:                          "hugo-wrapper",
-	Short:                        "Wrap hugo command",
-	Long:                         `This is a wrapper for the hugo command, it allows to use different version of hugo without struggle.`,
-	PersistentFParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
-	Args:                         cobra.ArbitraryArgs,
-	PersistentPreRun:             persistantPreRun,
-	PersistentPostRun:            persistantPostRun,
-	Run:                          func(cmd *cobra.Command, args []string) {},
+	Use:                "hugo-wrapper",
+	Short:              "Wrap hugo command",
+	Long:               `This is a wrapper for the hugo command, it allows to use different version of hugo without struggle.`,
+	FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
+	Args:               cobra.ArbitraryArgs,
+	PersistentPreRun:   persistantPreRun,
+	PersistentPostRun:  persistantPostRun,
+	Run:                func(cmd *cobra.Command, args []string) {},
 }
 
 // Execute ads all child commands to the root command and sets flags appropriately.
@@ -87,7 +87,7 @@ func getHugoCommand(args []string) (*exec.Cmd, error) {
 	hugoVersionManagerPath := path.Join(homePath, ".hugo-wrapper")
 	if _, err := os.Stat(hugoVersionManagerPath); err != nil {
 		fmt.Println("creation of ~/.hugo-wrapper")
-		os.Mkdir(hugoVersionManagerPath, os.ModeDir)
+		os.Mkdir(hugoVersionManagerPath, 0770)
 	}
 
 	versionManager, err := versionmanager.NewVersionManager(hugoVersionManagerPath)
