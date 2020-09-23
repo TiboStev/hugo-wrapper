@@ -1,0 +1,26 @@
+language: go
+
+go:
+- 1.15.x
+
+before_install:
+  # gox simplifies building for multiple architectures
+  - go get github.com/mitchellh/gox
+
+install:
+  - # skip
+  
+script: 
+  - go test ./... -cover -v -gcflags=-l
+  - gox -arch="amd64" -os="windows linux" -output=bin/{{.Dir}}_{{.OS}}_{{.Arch}}
+
+deploy:
+  provider: releases
+  api_key:
+    secure: MQhP3Hd5gE/8DOJ3uKZYZgSSVsKM5QRZW2sBbE/j+N2Rcs2RL+SY4vHPuXDTBLLzHUQQkCl3dePxDYoHlWSRXc5M54m4a+1radNj/smKuvJNoLkcrzqtEMb1jmmMCpyFepa/fHoup6uJAW1HiyfuK0wJPG4RCU/U2o3thJfDceqm38vnmNAbT4WvZpf0wfPE54oxWbjk0gutQl/KRmp5duJVZYLmn+nutuvoWMNP05OJWtcx17GY3xNnysTsLThX0CXOjTUuiQhzkewbFdyfikRmz5tj7A3IkU0XJ0Yes1oAjhdSh8nn229to8IGwgFms613wOQNaQ8zhvjNKPYhSUGleot2NEYQXpIIGUTSu/H6tCPUrQf0YKn7OZWCph4gpBKkkIDIoOSwNycnc10eZeHCz9nNZY2XvdKAZbBpGDwhhXCxQ8iISWYB8JfwK/5exI2FvUTi/Z3Ubsj7H6l0g5TiZVhakSnV1UPrmryvysDgqEkmToWK6kC7eYp2tw+xWYmIvPeLC4IP2OEO7ob55Z+bzv7sKO1a8mJ44/Yttp7nmcGHrFr4WeY0vK2H9LP10ynWt/+4wuFmRR9n3QHnoTuDxaKi1WZvp7O8CBzQGBLyB57/Dlf5idXaqUth3psDGdwnayna756wdowUOGhcA8NR8hjZS5h9KN50+EbJFLI=
+  file_glob: true
+  file: bin/*
+  on:
+    repo: TiboStev/hugo-wrapper
+    tags: true
+  skip_cleanup: 'true'
