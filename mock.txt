@@ -1,0 +1,1 @@
+mockgen.exe -source=repository_service.go -destination=mock_repository_service.go -package=versionmanager

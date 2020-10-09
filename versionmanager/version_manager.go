@@ -68,7 +68,6 @@ func isAlreadyInstalled(execPath string) bool {
 func binaryName() string {
 	if runtime.GOOS == "windows" {
 		return "hugo.exe"
-	} else {
-		return "hugo"
 	}
+	return "hugo"
 }

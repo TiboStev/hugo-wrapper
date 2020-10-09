@@ -39,9 +39,6 @@ func NewRepositoryService(repoType RepositoryType, organisation string, reposito
 	}
 }
 
-type githubRepositoryInterface interface {
-}
-
 type githubRepositoryServiceInterface interface {
 	GetLatestRelease(ctx context.Context, owner, repo string) (*github.RepositoryRelease, *github.Response, error)
 	GetReleaseByTag(ctx context.Context, owner, repo, tag string) (*github.RepositoryRelease, *github.Response, error)
@@ -52,6 +49,7 @@ type githubRepository struct {
 	service      githubRepositoryServiceInterface
 	organisation string
 	repository   string
+	pager        pager
 }
 
 type githubRelease struct {
@@ -63,11 +61,13 @@ type githubAsset struct {
 }
 
 func newGithubRepository(client *http.Client, organisation string, repository string) (repo *githubRepository) {
-	return &githubRepository{
+	repo = &githubRepository{
 		organisation: organisation,
 		repository:   repository,
 		service:      github.NewClient(client).Repositories,
 	}
+	repo.pager = newReleasePager(repo)
+	return
 }
 
 func (repo *githubRepository) GetLatestRelease() (Release, error) {
@@ -81,30 +81,30 @@ func (repo *githubRepository) GetReleaseByTag(tag string) (Release, error) {
 }
 
 func (repo *githubRepository) GetPreviousRelease(tag string) (Release, error) {
-	pager, err := repo.newReleasePager()
 	release, err := repo.GetReleaseByTag(tag)
 	if err != nil {
 		return nil, errors.Cause(err)
 	}
-	pointer := release.(*githubRelease)
-	err = pager.moveToPageContainingRelease(pointer)
+	gitRelease, err := repo.getPreviousReleaseWithRelease(release.(*githubRelease).RepositoryRelease)
+	return &githubRelease{gitRelease}, err
+}
+
+func (repo *githubRepository) getPreviousReleaseWithRelease(pointerRelease *github.RepositoryRelease) (*github.RepositoryRelease, error) {
+	pointerIndex, err := repo.pager.locateRelease(pointerRelease)
 	if err != nil {
-		return nil, errors.Cause(err)
+		return nil, err
 	}
-	pointerIndex, err := pager.findReleaseOnPage(pointer)
-	if err != nil {
-		return nil, errors.Cause(err)
-	}
-	if pointerIndex == (len(pager.currentReleases) - 1) {
-		if !pager.hasMore() {
-			return nil, fmt.Errorf("No previous release found for %s", pointer.GetName())
+	releasesOnPage := repo.pager.releasesOnPage()
+	if pointerIndex == (len(releasesOnPage) - 1) {
+		if !repo.pager.hasMore() {
+			return nil, fmt.Errorf("No previous release found for %s", pointerRelease.GetName())
 		}
-		if err = pager.getNextPage(); err != nil {
+		if err = repo.pager.getNextPage(); err != nil {
 			return nil, err
 		}
-		return &githubRelease{pager.currentReleases[0]}, nil
+		return repo.pager.releasesOnPage()[0], nil
 	}
-	return &githubRelease{pager.currentReleases[pointerIndex+1]}, nil
+	return releasesOnPage[pointerIndex+1], nil
 }
 
 func (release *githubRelease) GetName() string {
@@ -127,6 +127,16 @@ func (asset githubAsset) GetDownloadUrl() string {
 	return asset.ReleaseAsset.GetBrowserDownloadURL()
 }
 
+type pager interface {
+	toStart() error
+	moveToPageContainingRelease(release *github.RepositoryRelease) (err error)
+	findReleaseOnPage(release *github.RepositoryRelease) (index int, err error)
+	releasesOnPage() []*github.RepositoryRelease
+	hasMore() bool
+	getNextPage() error
+	locateRelease(pointerRelease *github.RepositoryRelease) (int, error)
+}
+
 type releasePager struct {
 	*githubRepository
 	currentReleases []*github.RepositoryRelease
@@ -134,44 +144,55 @@ type releasePager struct {
 	opt             *github.ListOptions
 }
 
-func (repo *githubRepository) newReleasePager() (*releasePager, error) {
-	pager := new(releasePager)
-	pager.githubRepository = repo
-	err := pager.toStart()
-	return pager, err
+func (pager *releasePager) releasesOnPage() []*github.RepositoryRelease {
+	return pager.currentReleases
+}
+
+func newReleasePager(repo *githubRepository) (pager pager) {
+	releasePager := new(releasePager)
+	releasePager.githubRepository = repo
+	return releasePager
 }
 
 func (pager *releasePager) hasMore() bool {
-	if pager.currentResponse == nil {
-		panic("the pager should have been initialize with newReleasePager")
-	}
 	return pager.currentResponse.NextPage != 0
 }
 
 func (pager *releasePager) toStart() (err error) {
 	pager.opt = &github.ListOptions{Page: 1}
-	pager.currentReleases, pager.currentResponse, err = pager.service.ListReleases(context.TODO(), pager.organisation, pager.repository, pager.opt)
-	return
+	return pager.listRelease()
 }
 
 func (pager *releasePager) getNextPage() (err error) {
-	if pager.currentResponse == nil {
-		panic("the pager should have been initialize with newReleasePager")
-	}
-	if !pager.hasMore() {
-		panic("no more releases to be found")
-	}
-	pager.opt.Page++
+	pager.opt.Page = pager.currentResponse.NextPage
+	return pager.listRelease()
+}
+
+func (pager *releasePager) listRelease() (err error) {
 	pager.currentReleases, pager.currentResponse, err = pager.service.ListReleases(context.TODO(), pager.organisation, pager.repository, pager.opt)
 	return
 }
 
-func (pager *releasePager) moveToPageContainingRelease(release *githubRelease) (err error) {
-	pager.toStart()
+func (pager *releasePager) locateRelease(pointerRelease *github.RepositoryRelease) (int, error) {
+	err := pager.toStart()
+	if err != nil {
+		return -1, errors.Cause(err)
+	}
+	err = pager.moveToPageContainingRelease(pointerRelease)
+	if err != nil {
+		return -1, errors.Cause(err)
+	}
+	return pager.findReleaseOnPage(pointerRelease)
+}
+
+func (pager *releasePager) moveToPageContainingRelease(release *github.RepositoryRelease) (err error) {
 	isFound := false
 	for isFound == false {
 		olderReleaseOnPage := pager.currentReleases[len(pager.currentReleases)-1]
-		isFound = release.GetCreatedAt().After(olderReleaseOnPage.GetCreatedAt().Time)
+		isFound = release.CreatedAt.Time.After(olderReleaseOnPage.CreatedAt.Time) || release.CreatedAt.Time.Equal(olderReleaseOnPage.CreatedAt.Time)
+		if isFound {
+			break
+		}
 		if !pager.hasMore() {
 			return fmt.Errorf("The release %s version has not been found", release.GetName())
 		}
@@ -182,11 +203,11 @@ func (pager *releasePager) moveToPageContainingRelease(release *githubRelease) (
 	return nil
 }
 
-func (pager *releasePager) findReleaseOnPage(release *githubRelease) (index int, err error) {
-	i := sort.Search(len(pager.currentReleases)-1, func(i int) bool {
-		return release.GetCreatedAt().After(pager.currentReleases[i].GetCreatedAt().Time)
+func (pager *releasePager) findReleaseOnPage(release *github.RepositoryRelease) (index int, err error) {
+	i := sort.Search(len(pager.currentReleases), func(i int) bool {
+		return (release.CreatedAt.Time.After(pager.currentReleases[i].CreatedAt.Time) || release.CreatedAt.Time.Equal(pager.currentReleases[i].CreatedAt.Time))
 	})
-	if i < len(pager.currentReleases) && release.GetCreatedAt().Equal(pager.currentReleases[i].GetCreatedAt()) {
+	if i < len(pager.currentReleases) && release.CreatedAt.Time.Equal(pager.currentReleases[i].CreatedAt.Time) {
 		return i, nil
 	}
 	return -1, fmt.Errorf("The version %s version has not been found", release.GetName())

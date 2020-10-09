@@ -14,15 +14,17 @@ type assetFinder interface {
 
 type finder struct {
 	repository            RepositoryClient
+	parser                coreVersionParser
 	latestRelease         Release
 	latestVersion         *coreVersion
 	latestSelectedRelease Release
 	latestSelectedVersion *coreVersion
 }
 
-func newAssetFinder() (assetFinder assetFinder) {
+func newAssetFinder(parser coreVersionParser) assetFinder {
 	finder := new(finder)
 	finder.repository = NewRepositoryService(Github, "gohugoio", "hugo", "", "")
+	finder.parser = parser
 	return finder
 }
 
@@ -32,7 +34,7 @@ func (finder *finder) findLatestVersion() (version *coreVersion, err error) {
 		if err != nil {
 			return nil, err
 		}
-		finder.latestSelectedVersion, _, err = parseCoreVersion(finder.latestSelectedRelease.GetName())
+		finder.latestSelectedVersion, _, err = finder.parser.parse(finder.latestSelectedRelease.GetName())
 		if err != nil {
 			return nil, err
 		}
@@ -85,7 +87,7 @@ func (finder *finder) resolveVersion(desiredVersion *coreVersion, precision vers
 	if err != nil {
 		return nil, err
 	}
-	finder.latestSelectedVersion, _, err = parseCoreVersion(finder.latestSelectedRelease.GetName())
+	finder.latestSelectedVersion, _, err = finder.parser.parse(finder.latestSelectedRelease.GetName())
 	return finder.latestSelectedVersion, err
 }
 

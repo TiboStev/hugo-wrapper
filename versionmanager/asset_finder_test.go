@@ -8,6 +8,37 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestFindLatestVersionWhenLatestVersionHasNotBeenFetchedYet(t *testing.T) {
+	finder := new(finder)
+	ctrl := gomock.NewController(t)
+	finder.repository = NewMockRepositoryClient(ctrl)
+
+	actualRelease := fetchLatest(ctrl, finder.repository.(*MockRepositoryClient), "v0.72.3")
+
+	finder.findLatestVersion()
+	assert.Equal(t, 0, finder.latestSelectedVersion.major)
+	assert.Equal(t, 72, finder.latestSelectedVersion.minor)
+	assert.Equal(t, 3, finder.latestSelectedVersion.patch)
+	if finder.latestSelectedRelease != actualRelease {
+		t.Errorf("the latest release should be the one returned by the repository service")
+	}
+}
+
+func TestFindLatestVersionWhenLatestVersionHasAlreadyBeenFetched(t *testing.T) {
+	finder := new(finder)
+	ctrl := gomock.NewController(t)
+	finder.repository = NewMockRepositoryClient(ctrl)
+
+}
+
+func fetchLatest(ctrl *gomock.Controller, repository *MockRepositoryClient, latestVersion string) Release {
+	release := NewMockRelease(ctrl)
+
+	repository.EXPECT().GetLatestRelease().Return(release, nil)
+	release.EXPECT().GetName().Return(latestVersion)
+	return release
+}
+
 type assetNameTestingItem struct {
 	os            string
 	arch          string
@@ -140,45 +171,5 @@ func testResolveMinor() {
 
 }
 func testResolvePatch() {
-
-}
-
-func TestFindLatestVersion(t *testing.T) {
-	whenLatestVersionHasNotBeenFetchedYet(t)
-	//whenLatestVersionHasAlreadyBeenFetched(t)
-
-}
-
-func whenLatestVersionHasNotBeenFetchedYet(t *testing.T) {
-	finder := new(finder)
-	ctrl := gomock.NewController(t)
-
-	// Assert that Bar() is invoked.
-	defer ctrl.Finish()
-
-	repository := NewMockRepositoryClient(ctrl)
-	release := NewMockRelease(ctrl)
-
-	repository.EXPECT().GetLatestRelease().Return(release, nil)
-	release.EXPECT().GetName().Return("v0.72.3")
-
-	finder.repository = repository
-	finder.findLatestVersion()
-	assert.Equal(t, 0, finder.latestSelectedVersion.major)
-	assert.Equal(t, 72, finder.latestSelectedVersion.minor)
-	assert.Equal(t, 3, finder.latestSelectedVersion.patch)
-	if finder.latestSelectedRelease != release {
-		t.Errorf("the latest release should be the one returned by the repository service")
-	}
-}
-
-func whenLatestVersionHasAlreadyBeenFetched(t *testing.T) {
-	finder := new(finder)
-	ctrl := gomock.NewController(t)
-
-	// Assert that Bar() is invoked.
-	defer ctrl.Finish()
-
-	finder.repository = NewMockRepositoryClient(ctrl)
 
 }

@@ -33,11 +33,12 @@ type Version struct {
 }
 
 func NewVersion(desiredVersion string) (*Version, error) {
-	finder := newAssetFinder()
-	return newVersion(finder, desiredVersion)
+	parser := new(coreVersionParserImpl)
+	finder := newAssetFinder(parser)
+	return newVersion(finder, parser, desiredVersion)
 }
 
-func newVersion(finder assetFinder, desiredVersion string) (selectedVersion *Version, err error) {
+func newVersion(finder assetFinder, parser coreVersionParser, desiredVersion string) (selectedVersion *Version, err error) {
 	selectedVersion = new(Version)
 	selectedVersion.finder = finder
 
@@ -51,7 +52,7 @@ func newVersion(finder assetFinder, desiredVersion string) (selectedVersion *Ver
 		return selectedVersion, err
 	}
 
-	coreVersion, precision, err := parseCoreVersion(desiredVersion)
+	coreVersion, precision, err := parser.parse(desiredVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +61,13 @@ func newVersion(finder assetFinder, desiredVersion string) (selectedVersion *Ver
 	return
 }
 
-func parseCoreVersion(version string) (*coreVersion, versionPrecision, error) {
+type coreVersionParser interface {
+	parse(version string) (*coreVersion, versionPrecision, error)
+}
+
+type coreVersionParserImpl struct{}
+
+func (*coreVersionParserImpl) parse(version string) (*coreVersion, versionPrecision, error) {
 	if version[0] == 'v' {
 		version = version[1:]
 	}
